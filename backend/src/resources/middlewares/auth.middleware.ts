@@ -16,7 +16,7 @@ export interface AuthenticatedRequest extends Request {
 
 const isAuthenticatedUser = (
   value: string | jwt.JwtPayload,
-): value is AuthenticatedRequest["usuario"] => {
+): value is NonNullable<AuthenticatedRequest["usuario"]> => {
   if (typeof value === "string") {
     return false;
   }
