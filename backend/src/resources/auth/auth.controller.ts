@@ -6,6 +6,9 @@ import {
   registerFailedLoginAttempt,
 } from "../middlewares/rate-limit.middleware";
 
+const secureCookieEnabled =
+  (process.env.COOKIE_SECURE || "").toLowerCase() === "true";
+
 export const loginController = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -21,7 +24,7 @@ export const loginController = async (req: Request, res: Response) => {
 
     res.cookie("token", token, {
       httpOnly: true, 
-      secure: process.env.NODE_ENV === "production", 
+      secure: secureCookieEnabled,
       sameSite: "lax", 
       maxAge: 8 * 60 * 60 * 1000, 
       path: "/",
@@ -37,7 +40,7 @@ export const loginController = async (req: Request, res: Response) => {
 export const logoutController = (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookieEnabled,
     sameSite: "lax",
     path: "/",
   });
