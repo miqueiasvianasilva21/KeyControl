@@ -14,6 +14,21 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+const isAuthenticatedUser = (
+  value: string | jwt.JwtPayload,
+): value is AuthenticatedRequest["usuario"] => {
+  if (typeof value === "string") {
+    return false;
+  }
+
+  return (
+    typeof value.id === "number" &&
+    typeof value.name === "string" &&
+    typeof value.email === "string" &&
+    typeof value.role === "string"
+  );
+};
+
 export const verificarToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
 
   const authHeader = req.headers.authorization;
@@ -34,8 +49,11 @@ export const verificarToken = (req: AuthenticatedRequest, res: Response, next: N
  
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    
-    
+
+    if (!isAuthenticatedUser(decoded)) {
+      return res.status(401).json({ error: "Sessão inválida. Faça login novamente." });
+    }
+
     req.usuario = decoded;
     
     next(); 

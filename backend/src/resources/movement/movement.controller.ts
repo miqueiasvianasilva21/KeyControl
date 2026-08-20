@@ -3,11 +3,19 @@ import * as movementService from "./movement.service";
 
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 
+const getAuthenticatedAdminId = (req: AuthenticatedRequest) => {
+  if (!req.usuario) {
+    throw new Error("Acesso negado. Faça login para realizar esta operação.");
+  }
+
+  return req.usuario.id;
+};
+
 export const create = async (req: AuthenticatedRequest, res: Response) => {
   try {
     
     const { type, userId, itemId } = req.body;
-    const adminLogadoId = req.usuario.id; 
+    const adminLogadoId = getAuthenticatedAdminId(req);
     
     const newMovement = await movementService.createMovement({
       type,
@@ -36,7 +44,7 @@ export const reportarPerdaController = async (req: AuthenticatedRequest, res: Re
     const { itemId } = req.body; 
     
   
-    const adminLogadoId = req.usuario.id; 
+    const adminLogadoId = getAuthenticatedAdminId(req);
 
     if (!itemId) {
       return res.status(400).json({ error: "O ID da chave (itemId) é obrigatório." });
@@ -52,7 +60,7 @@ export const reportarPerdaController = async (req: AuthenticatedRequest, res: Re
 export const recuperarItemController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { itemId } = req.body; 
-    const adminLogadoId = req.usuario.id; 
+    const adminLogadoId = getAuthenticatedAdminId(req);
     if (!itemId) {
       return res.status(400).json({ error: "O ID do item é obrigatório." });
     }

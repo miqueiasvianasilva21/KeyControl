@@ -1,10 +1,12 @@
 import bcrypt from "bcrypt";
+import { AdminRole } from "@prisma/client";
 import { prisma } from "../../database/prisma";
 
 export interface CreateAdminDTO {
   name: string;
   email: string;
-  password?: string; 
+  password?: string;
+  role?: AdminRole;
 }
 
 
