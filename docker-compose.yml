@@ -26,8 +26,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://admin:adminpassword@db:5432/db_chaves?schema=public}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       NODE_ENV: ${NODE_ENV:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://${APP_HOST:-localhost}:${FRONTEND_PORT:-5173}}
-      FRONTEND_URL: ${FRONTEND_URL:-http://${APP_HOST:-localhost}:${FRONTEND_PORT:-5173}}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-change-this-admin-password}
     depends_on:
       - db
@@ -43,7 +43,7 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - APP_HOST=${APP_HOST:-localhost}
-      - VITE_API_URL=${BACKEND_URL:-http://${APP_HOST:-localhost}:${BACKEND_PORT:-3000}}
+      - VITE_API_URL=${BACKEND_URL:-http://localhost:3000}
     depends_on:
       - backend
 
