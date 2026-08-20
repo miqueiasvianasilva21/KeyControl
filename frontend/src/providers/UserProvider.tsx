@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useMemo, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useEffect,
+  ReactNode,
+} from 'react';
 
 export interface Item {
   id: number;
@@ -15,109 +22,153 @@ export interface Usuario {
   id: number;
   fullName: string;
   phone: string;
-  role: "STUDENT" | "TEACHER" | "ADMIN" | "EXTERNAL";
+  role: 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE';
   authorizationsReceived?: AuthorizationReceived[];
 }
 
 interface UserContextData {
   usuarios: Usuario[];
-  salasBanco: Item[]; // Alterado de chaves/kits para Salas
+  salasBanco: Item[];
   professores: Usuario[];
-  
-  filtroTipo: "todos" | "STUDENT" | "TEACHER" | "EXTERNAL";
-  setFiltroTipo: (val: "todos" | "STUDENT" | "TEACHER" | "EXTERNAL") => void;
+
+  filtroTipo: 'todos' | 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE';
+  setFiltroTipo: (val: 'todos' | 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE') => void;
   termoBusca: string;
   setTermoBusca: (val: string) => void;
+
   usuariosFiltrados: Usuario[];
 
-  mostrarDialogForm: boolean; setMostrarDialogForm: (val: boolean) => void;
+  paginaAtual: number;
+  setPaginaAtual: (pagina: number) => void;
+  totalPaginas: number;
+  usuariosPaginados: Usuario[];
+
+  mostrarDialogForm: boolean;
+  setMostrarDialogForm: (val: boolean) => void;
   usuarioEditandoId: number | null;
-  formNome: string; setFormNome: (val: string) => void;
-  formTelefone: string; setFormTelefone: (val: string) => void;
-  formTipo: "STUDENT" | "TEACHER" | "EXTERNAL"; setFormTipo: (val: "STUDENT" | "TEACHER" | "EXTERNAL") => void;
-  
-  // Lista unificada de autorizações por Sala
+  formNome: string;
+  setFormNome: (val: string) => void;
+  formTelefone: string;
+  setFormTelefone: (val: string) => void;
+  formTipo: 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE';
+  setFormTipo: (val: 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE') => void;
   formAutorizacoes: { roomId: number; teacherId: number }[];
-  
+
   carregarDadosGlobais: () => Promise<void>;
   handleCriarUsuario: () => void;
   handleEditarUsuario: (id: number) => void;
   handleSalvarUsuario: () => Promise<void>;
   handleRemoverUsuario: (id: number) => Promise<void>;
-  
   handleAdicionarAutorizacao: () => void;
   handleRemoverAutorizacao: (index: number) => void;
-  handleAtualizarAutorizacao: (index: number, field: "roomId" | "teacherId", value: number) => void;
+  handleAtualizarAutorizacao: (
+    index: number,
+    field: 'roomId' | 'teacherId',
+    value: number,
+  ) => void;
 }
 
-const API_URL = "http://localhost:3000";
+const roleNeedsRoomAuthorization = (role: Usuario['role']) =>
+  role !== 'TEACHER' && role !== 'ADMINISTRATIVE';
 
+const API_URL =
+  (import.meta as unknown as { env: { VITE_API_URL?: string } }).env
+    ?.VITE_API_URL || 'http://localhost:3000';
+const ITENS_POR_PAGINA = 12;
 const UserContext = createContext<UserContextData>({} as UserContextData);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [salasBanco, setSalasBanco] = useState<Item[]>([]);
-  
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "STUDENT" | "TEACHER" | "EXTERNAL">("todos");
-  const [termoBusca, setTermoBusca] = useState("");
-  
+
+  const [filtroTipo, setFiltroTipo] = useState<
+    'todos' | 'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE'
+  >('todos');
+  const [termoBusca, setTermoBusca] = useState('');
+  const [paginaAtual, setPaginaAtual] = useState(1);
+
   const [mostrarDialogForm, setMostrarDialogForm] = useState(false);
-  const [usuarioEditandoId, setUsuarioEditandoId] = useState<number | null>(null);
+  const [usuarioEditandoId, setUsuarioEditandoId] = useState<number | null>(
+    null,
+  );
 
-  const [formNome, setFormNome] = useState("");
-  const [formTelefone, setFormTelefone] = useState("");
-  const [formTipo, setFormTipo] = useState<"STUDENT" | "TEACHER" | "EXTERNAL">("STUDENT");
-  
-  // Agora as autorizações são concedidas por Sala inteira, não por item solto
-  const [formAutorizacoes, setFormAutorizacoes] = useState<{ roomId: number; teacherId: number }[]>([]);
+  const [formNome, setFormNome] = useState('');
+  const [formTelefone, setFormTelefone] = useState('');
+  const [formTipo, setFormTipo] = useState<'STUDENT' | 'TEACHER' | 'EXTERNAL' | 'ADMINISTRATIVE'>(
+    'STUDENT',
+  );
+  const [formAutorizacoes, setFormAutorizacoes] = useState<
+    { roomId: number; teacherId: number }[]
+  >([]);
 
-  const professores = useMemo(() => usuarios.filter((u) => u.role === "TEACHER"), [usuarios]);
+  const professores = useMemo(
+    () => usuarios.filter((u) => u.role === 'TEACHER'),
+    [usuarios],
+  );
 
   useEffect(() => {
     carregarDadosGlobais();
   }, []);
 
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [termoBusca, filtroTipo]);
+
   const carregarDadosGlobais = async () => {
     try {
       const [resUsers, resRooms] = await Promise.all([
-        fetch(`${API_URL}/users`),
-        fetch(`${API_URL}/rooms`) // Busca as salas em vez de chaves/kits
+        fetch(`${API_URL}/users`, { credentials: 'include' }),
+        fetch(`${API_URL}/rooms`, { credentials: 'include' }),
       ]);
-      
+
       if (resUsers.ok) {
-  setUsuarios(await resUsers.json());
-}
-      
+        setUsuarios(await resUsers.json());
+      }
+
       if (resRooms.ok) {
         const roomsData = await resRooms.json();
-        // Formata as salas para exibição no dropdown
-        setSalasBanco(roomsData.map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          code: r.number || r.block
-        })));
+        setSalasBanco(
+          roomsData.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            code: r.number || r.block,
+          })),
+        );
       }
-    } catch (error) { console.error("Erro ao carregar dados:", error); }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
   };
 
   const usuariosFiltrados = useMemo(() => {
     return usuarios.filter((usuario) => {
-      const matchTipo = filtroTipo === "todos" || usuario.role === filtroTipo;
-      const matchBusca = usuario.fullName.toLowerCase().includes(termoBusca.toLowerCase());
+      const matchTipo = filtroTipo === 'todos' || usuario.role === filtroTipo;
+      const matchBusca = usuario.fullName
+        .toLowerCase()
+        .includes(termoBusca.toLowerCase());
       return matchTipo && matchBusca;
     });
   }, [usuarios, filtroTipo, termoBusca]);
 
+  const totalPaginas = useMemo(() => {
+    return Math.ceil(usuariosFiltrados.length / ITENS_POR_PAGINA) || 1;
+  }, [usuariosFiltrados]);
+
+  const usuariosPaginados = useMemo(() => {
+    const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+    return usuariosFiltrados.slice(inicio, inicio + ITENS_POR_PAGINA);
+  }, [usuariosFiltrados, paginaAtual]);
+
   useEffect(() => {
-    if (formTipo === "TEACHER") {
-      setFormAutorizacoes([]); // Professor não precisa de autorização extra, ele mesmo autoriza
+    if (!roleNeedsRoomAuthorization(formTipo)) {
+      setFormAutorizacoes([]);
     }
   }, [formTipo]);
 
   const resetarFormulario = () => {
-    setFormNome("");
-    setFormTelefone("");
-    setFormTipo("STUDENT");
+    setFormNome('');
+    setFormTelefone('');
+    setFormTipo('STUDENT');
     setFormAutorizacoes([]);
     setUsuarioEditandoId(null);
   };
@@ -133,17 +184,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setUsuarioEditandoId(usuario.id);
       setFormNome(usuario.fullName);
       setFormTelefone(usuario.phone);
-      
       setFormTipo(
-        usuario.role === "TEACHER" ? "TEACHER" : 
-        usuario.role === "EXTERNAL" ? "EXTERNAL" : "STUDENT"
+        usuario.role === 'TEACHER'
+          ? 'TEACHER'
+          : usuario.role === 'EXTERNAL'
+            ? 'EXTERNAL'
+            : usuario.role === 'ADMINISTRATIVE'
+              ? 'ADMINISTRATIVE'
+            : 'STUDENT',
       );
-      
-      const autorizacoes = usuario.authorizationsReceived?.map(a => ({ 
-        roomId: a.roomId, 
-        teacherId: a.teacherId 
-      })) || [];
-      
+
+      const autorizacoes =
+        usuario.authorizationsReceived?.map((a) => ({
+          roomId: a.roomId,
+          teacherId: a.teacherId,
+        })) || [];
+
       setFormAutorizacoes(autorizacoes);
       setMostrarDialogForm(true);
     }
@@ -151,21 +207,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const handleSalvarUsuario = async () => {
     if (!formNome.trim() || !formTelefone.trim()) {
-      return alert("Por favor, preencha todos os campos obrigatórios.");
+      return alert('Por favor, preencha todos os campos obrigatórios.');
     }
 
-    if (formTipo !== "TEACHER") {
-      const incompletas = formAutorizacoes.some((auth) => !auth.roomId || !auth.teacherId);
+    if (roleNeedsRoomAuthorization(formTipo)) {
+      const incompletas = formAutorizacoes.some(
+        (auth) => !auth.roomId || !auth.teacherId,
+      );
       if (incompletas) {
-        return alert("Por favor, preencha a sala e o professor autorizador de todas as linhas de autorização.");
+        return alert(
+          'Por favor, preencha a sala e o professor autorizador de todas as linhas de autorização.',
+        );
       }
 
-      // NOVO: Verifica se existem salas duplicadas no formulário
-      const salasSelecionadas = formAutorizacoes.map(auth => Number(auth.roomId));
-      const temSalasDuplicadas = new Set(salasSelecionadas).size !== salasSelecionadas.length;
-      
+      const salasSelecionadas = formAutorizacoes.map((auth) =>
+        Number(auth.roomId),
+      );
+      const temSalasDuplicadas =
+        new Set(salasSelecionadas).size !== salasSelecionadas.length;
+
       if (temSalasDuplicadas) {
-        return alert("Você não pode autorizar a mesma sala mais de uma vez para o mesmo usuário. Remova a duplicata para continuar.");
+        return alert(
+          'Você não pode autorizar a mesma sala mais de uma vez para o mesmo usuário. Remova a duplicata para continuar.',
+        );
       }
     }
 
@@ -173,24 +237,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
       fullName: formNome,
       phone: formTelefone,
       role: formTipo,
-      roomAuthorizations: formTipo !== "TEACHER" ? formAutorizacoes.map(a => ({ 
-        roomId: Number(a.roomId), 
-        teacherId: Number(a.teacherId) 
-      })) : []
+      roomAuthorizations:
+        roleNeedsRoomAuthorization(formTipo)
+          ? formAutorizacoes.map((a) => ({
+              roomId: Number(a.roomId),
+              teacherId: Number(a.teacherId),
+            }))
+          : [],
     };
 
     try {
       let response;
       if (usuarioEditandoId) {
         response = await fetch(`${API_URL}/users/${usuarioEditandoId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(payload),
         });
       } else {
         response = await fetch(`${API_URL}/users`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(payload),
         });
       }
@@ -201,41 +270,77 @@ export function UserProvider({ children }: { children: ReactNode }) {
         resetarFormulario();
       } else {
         const errData = await response.json();
-        alert(errData.error || "Erro ao salvar usuário.");
+        alert(errData.error || 'Erro ao salvar usuário.');
       }
-    } catch (error) { 
-      console.error("Erro no fetch:", error); 
-      alert("Erro de conexão."); 
+    } catch (error) {
+      console.error('Erro no fetch:', error);
+      alert('Erro de conexão.');
     }
   };
 
   const handleRemoverUsuario = async (id: number) => {
-    if (confirm("Tem certeza que deseja remover este usuário?")) {
-      const response = await fetch(`${API_URL}/users/${id}`, { method: "DELETE" });
+    if (confirm('Tem certeza que deseja remover este usuário?')) {
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
       if (response.ok) carregarDadosGlobais();
     }
   };
 
-  // Funções simplificadas para manipular o novo array único de autorizações
-  const handleAdicionarAutorizacao = () => setFormAutorizacoes((prev) => [...prev, { roomId: 0, teacherId: 0 }]);
-  const handleRemoverAutorizacao = (index: number) => setFormAutorizacoes((prev) => prev.filter((_, i) => i !== index));
-  const handleAtualizarAutorizacao = (index: number, field: "roomId" | "teacherId", value: number) => {
-    setFormAutorizacoes((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  const handleAdicionarAutorizacao = () =>
+    setFormAutorizacoes((prev) => [...prev, { roomId: 0, teacherId: 0 }]);
+  const handleRemoverAutorizacao = (index: number) =>
+    setFormAutorizacoes((prev) => prev.filter((_, i) => i !== index));
+  const handleAtualizarAutorizacao = (
+    index: number,
+    field: 'roomId' | 'teacherId',
+    value: number,
+  ) => {
+    setFormAutorizacoes((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+    );
   };
 
   return (
-    <UserContext.Provider value={{
-      usuarios, salasBanco, professores,
-      filtroTipo, setFiltroTipo, termoBusca, setTermoBusca, usuariosFiltrados,
-      mostrarDialogForm, setMostrarDialogForm, usuarioEditandoId,
-      formNome, setFormNome, formTelefone, setFormTelefone, formTipo, setFormTipo,
-      formAutorizacoes, carregarDadosGlobais, handleCriarUsuario, handleEditarUsuario,
-      handleSalvarUsuario, handleRemoverUsuario, handleAdicionarAutorizacao,
-      handleRemoverAutorizacao, handleAtualizarAutorizacao
-    }}>
+    <UserContext.Provider
+      value={{
+        usuarios,
+        salasBanco,
+        professores,
+        filtroTipo,
+        setFiltroTipo,
+        termoBusca,
+        setTermoBusca,
+        usuariosFiltrados,
+        paginaAtual,
+        setPaginaAtual,
+        totalPaginas,
+        usuariosPaginados,
+        mostrarDialogForm,
+        setMostrarDialogForm,
+        usuarioEditandoId,
+        formNome,
+        setFormNome,
+        formTelefone,
+        setFormTelefone,
+        formTipo,
+        setFormTipo,
+        formAutorizacoes,
+        carregarDadosGlobais,
+        handleCriarUsuario,
+        handleEditarUsuario,
+        handleSalvarUsuario,
+        handleRemoverUsuario,
+        handleAdicionarAutorizacao,
+        handleRemoverAutorizacao,
+        handleAtualizarAutorizacao,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useUsers = () => useContext(UserContext);

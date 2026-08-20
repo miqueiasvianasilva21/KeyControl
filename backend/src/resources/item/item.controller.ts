@@ -4,7 +4,9 @@ import {
   getAllItemsService,
   getItemByIdService,
   updateItemService,
-  deleteItemService
+  deleteItemService,
+  updateItemStatusService,
+  searchItemForReturn
 } from "./item.service";
 
 export const createItem = async (req: Request, res: Response) => {
@@ -64,6 +66,23 @@ export const updateItem = async (req: Request, res: Response) => {
   }
 };
 
+
+export const updateItemStatus = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: "O status é obrigatório." });
+    }
+
+    const updatedItem = await updateItemStatusService(id, status);
+    return res.status(200).json(updatedItem);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 export const deleteItem = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -71,5 +90,25 @@ export const deleteItem = async (req: Request, res: Response) => {
     return res.status(204).send();
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
+  }
+};
+
+export const searchItemByCode = async (req: Request, res: Response) => {
+  try {
+    const code = req.query.code as string;
+
+    if (!code) {
+      return res.status(400).json({ error: "O parâmetro 'code' é obrigatório." });
+    }
+
+    const item = await searchItemForReturn(code);
+
+    if (!item) {
+      return res.status(404).json({ error: "Item não encontrado no sistema." });
+    }
+
+    return res.status(200).json(item);
+  } catch (error: any) {
+    return res.status(500).json({ error: "Erro interno do servidor ao buscar o item." });
   }
 };

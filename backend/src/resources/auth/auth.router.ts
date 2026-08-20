@@ -1,12 +1,19 @@
 import { Router } from "express";
-import { loginController, logoutController } from "./auth.controller";
+import {
+  loginController,
+  logoutController,
+  meController,
+} from "./auth.controller";
+import { verificarToken } from "../middlewares/auth.middleware";
+import { loginRateLimiter } from "../middlewares/rate-limit.middleware";
 
 const router = Router();
 
-// Rota para fazer o login (Gera o Cookie)
-router.post("/login", loginController);
 
-// Rota para fazer logout (Limpa o Cookie)
+router.post("/login", loginRateLimiter, loginController);
+
+
 router.post("/logout", logoutController);
+router.get("/me", verificarToken, meController);
 
 export default router;

@@ -1,19 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export interface Item {
   id: number;
   name: string;
   code: string;
-  status: "AVAILABLE" | "UNAVAILABLE" | "LOST";
-  type: "KEY" | "KIT";
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'LOST';
+  type: 'KEY' | 'KIT';
   possuidorNome?: string;
   userId?: number;
 }
 
 interface ConfirmacaoState {
-  item: Item;
+  items: Item[];
   mostrar: boolean;
-  tempoRestante: number;
 }
 
 interface ReceiveContextData {
@@ -22,155 +21,180 @@ interface ReceiveContextData {
   confirmacao: ConfirmacaoState | null;
   erro: string;
   sucesso: string;
-  porcentagemTempo: number;
   handleBuscar: () => Promise<void>;
   handleKeyPress: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  handleConfirmar: () => void;
+  handleConfirmar: (ids: number[]) => void;
   handleCancelar: () => void;
 }
 
-const API_URL = "http://localhost:3000";
-const TEMPO_TOTAL = 5000; 
-const INTERVALO = 50; 
+const API_URL =
+  (import.meta as unknown as { env: { VITE_API_URL?: string } }).env
+    ?.VITE_API_URL || 'http://localhost:3000';
 
-const ReceiveContext = createContext<ReceiveContextData>({} as ReceiveContextData);
+const ReceiveContext = createContext<ReceiveContextData>(
+  {} as ReceiveContextData,
+);
 
 export function ReceiveProvider({ children }: { children: ReactNode }) {
-  const [codigo, setCodigo] = useState("");
+  const [codigo, setCodigo] = useState('');
   const [confirmacao, setConfirmacao] = useState<ConfirmacaoState | null>(null);
-  const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
-  const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (confirmacao?.mostrar) {
-      intervalRef.current = window.setInterval(() => {
-        setConfirmacao((prev) => {
-          if (!prev) return null;
-          const novoTempo = prev.tempoRestante - INTERVALO;
-
-          if (novoTempo <= 0) {
-            realizarDevolucao(prev.item);
-            return null;
-          }
-          return { ...prev, tempoRestante: novoTempo };
-        });
-      }, INTERVALO);
-
-      return () => {
-        if (intervalRef.current !== null) {
-          clearInterval(intervalRef.current);
-        }
-      };
-    }
-  }, [confirmacao?.mostrar]);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
 
   const handleBuscar = async () => {
-    setErro("");
-    setSucesso("");
+    setErro('');
+    setSucesso('');
 
-    const buscaLimpa = codigo.trim().toLowerCase();
+    const buscaLimpa = codigo.trim();
     if (!buscaLimpa) {
-      setErro("Por favor, digite o código ou nome do item.");
+      setErro('Por favor, digite o número da sala.');
       return;
     }
 
     try {
-      const resRooms = await fetch(`${API_URL}/rooms`);
-      if (!resRooms.ok) throw new Error("Erro ao buscar dados das salas.");
-      const rooms = await resRooms.json();
-      
-      const todosOsItens: Item[] = rooms.flatMap((room: any) => room.items);
-      
-      const itemAchei = todosOsItens.find(i => 
-        i.code.toLowerCase() === buscaLimpa || i.name.toLowerCase() === buscaLimpa
-      );
+      const res = await fetch(`${API_URL}/rooms`, { credentials: 'include' });
 
-      if (!itemAchei) return setErro("Item não encontrado no sistema.");
-      if (itemAchei.status === "AVAILABLE") return setErro(`O item "${itemAchei.name}" já consta como disponível na secretaria.`);
-      if (itemAchei.status === "LOST") return setErro(`Atenção: "${itemAchei.name}" está marcado como PERDIDO.`);
-
-      const resMovements = await fetch(`${API_URL}/movements`);
-      if (resMovements.ok) {
-        const movimentacoes: any[] = await resMovements.json();
-        
-        const ultimaMov = movimentacoes
-          .filter(m => m.itemId === itemAchei.id && m.type === "BORROW")
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
-        if (ultimaMov) {
-          itemAchei.possuidorNome = ultimaMov.user?.fullName;
-          itemAchei.userId = ultimaMov.userId;
-        }
+      if (!res.ok) {
+        throw new Error(`Erro do servidor (Status ${res.status})`);
       }
 
-      setConfirmacao({ item: itemAchei, mostrar: true, tempoRestante: TEMPO_TOTAL });
+      const rooms = await res.json();
 
-    } catch (e) {
+      const roomEncontrada = rooms.find(
+        (r: any) =>
+          r.number.toLowerCase() === buscaLimpa.toLowerCase() ||
+          r.name.toLowerCase() === buscaLimpa.toLowerCase(),
+      );
+
+      if (!roomEncontrada) {
+        return setErro('Sala não encontrada no sistema.');
+      }
+
+      const itensEmprestados = roomEncontrada.items.filter(
+        (i: any) => i.status === 'UNAVAILABLE',
+      );
+
+      if (itensEmprestados.length === 0) {
+        return setErro(
+          `Nenhum recurso consta como emprestado para a sala ${roomEncontrada.name}.`,
+        );
+      }
+
+      const itemsFormatados: Item[] = itensEmprestados.map((i: any) => {
+        let possuidorNome = '';
+        let userId: number | undefined;
+
+        if (
+          i.movements &&
+          i.movements.length > 0 &&
+          i.movements[0].type === 'BORROW'
+        ) {
+          possuidorNome = i.movements[0].user?.fullName;
+          userId = i.movements[0].userId;
+        }
+
+        return {
+          id: i.id,
+          name: i.name,
+          code: i.code,
+          status: i.status,
+          type: i.type,
+          possuidorNome,
+          userId,
+        };
+      });
+
+      setConfirmacao({
+        items: itemsFormatados,
+        mostrar: true,
+      });
+    } catch (e: unknown) {
       console.error(e);
-      setErro("Erro ao conectar com o servidor.");
+      const mensagem =
+        e instanceof Error ? e.message : 'Erro ao conectar com o servidor.';
+      setErro(mensagem);
     }
   };
 
-  const realizarDevolucao = async (item: Item) => {
+  const realizarDevolucao = async (
+    itemIds: number[],
+    itensTotais: Item[] = confirmacao?.items || [],
+  ) => {
     try {
-      const movRes = await fetch(`${API_URL}/movements`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "RETURN", 
-          adminId: 1, 
-          itemId: item.id,
-          userId: item.userId
-        }),
-      });
+      const itensParaDevolver = itensTotais.filter((i) =>
+        itemIds.includes(i.id),
+      );
 
-      if (!movRes.ok) {
-        const erroBackend = await movRes.json();
-        throw new Error(erroBackend.error || "O banco de dados recusou o registro da devolução.");
-      }
+      if (itensParaDevolver.length === 0) return;
 
-      setSucesso(`Sucesso! "${item.code}" foi devolvido e liberado para uso.`);
-      setCodigo("");
+      await Promise.all(
+        itensParaDevolver.map((item) =>
+          fetch(`${API_URL}/movements`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              type: 'RETURN',
+              itemId: item.id,
+              userId: item.userId,
+            }),
+          }).then(async (movRes) => {
+            if (!movRes.ok) {
+              const erroBackend = await movRes.json().catch(() => ({}));
+              throw new Error(
+                erroBackend.error ||
+                  `O banco recusou a devolução do item ${item.name}.`,
+              );
+            }
+          }),
+        ),
+      );
+
+      setSucesso(
+        `Sucesso! ${itensParaDevolver.length} recurso(s) devolvido(s) e liberado(s) para uso.`,
+      );
+      setCodigo('');
       setConfirmacao(null);
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setErro(error.message || "Erro operacional ao registrar a devolução.");
-    } finally {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : 'Erro operacional ao registrar a devolução.';
+      setErro(mensagem);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleBuscar();
+    if (e.key === 'Enter') handleBuscar();
   };
 
-  const handleConfirmar = () => {
-    if (confirmacao) realizarDevolucao(confirmacao.item);
+  const handleConfirmar = (ids: number[]) => {
+    realizarDevolucao(ids);
   };
 
   const handleCancelar = () => {
     setConfirmacao(null);
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
   };
 
-  const porcentagemTempo = confirmacao ? (confirmacao.tempoRestante / TEMPO_TOTAL) * 100 : 0;
-
   return (
-    <ReceiveContext.Provider value={{
-      codigo, setCodigo, confirmacao, erro, sucesso, porcentagemTempo,
-      handleBuscar, handleKeyPress, handleConfirmar, handleCancelar
-    }}>
+    <ReceiveContext.Provider
+      value={{
+        codigo,
+        setCodigo,
+        confirmacao,
+        erro,
+        sucesso,
+        handleBuscar,
+        handleKeyPress,
+        handleConfirmar,
+        handleCancelar,
+      }}
+    >
       {children}
     </ReceiveContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useReceive = () => useContext(ReceiveContext);

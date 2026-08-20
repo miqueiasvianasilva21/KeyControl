@@ -1,53 +1,65 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import * as movementService from "./movement.service";
 
-export const reportarPerdaController = async (req: Request, res: Response) => {
+import { AuthenticatedRequest } from "../middlewares/auth.middleware";
+
+export const create = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const itemId = Number(req.params.id);
-    const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
+    
+    const { type, userId, itemId } = req.body;
+    const adminLogadoId = req.usuario.id; 
+    
+    const newMovement = await movementService.createMovement({
+      type,
+      userId,
+      adminId: adminLogadoId,
+      itemId,
+    });
+    
+    return res.status(201).json(newMovement);
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message || "Erro ao registrar movimentação." });
+  }
+};
 
-    if (!token) {
-      return res.status(401).json({ error: "Não autorizado. Token não encontrado." });
+export const list = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const movements = await movementService.getAllMovements();
+    return res.status(200).json(movements);
+  } catch (error) {
+    return res.status(500).json({ error: "Erro interno ao buscar movimentações." });
+  }
+};
+
+export const reportarPerdaController = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { itemId } = req.body; 
+    
+  
+    const adminLogadoId = req.usuario.id; 
+
+    if (!itemId) {
+      return res.status(400).json({ error: "O ID da chave (itemId) é obrigatório." });
     }
 
-    const JWT_SECRET = process.env.JWT_SECRET || "chave_secreta_super_segura_do_tcc";
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const adminId = decoded.id; 
-
-    if (!itemId || !adminId) {
-      return res.status(400).json({ error: "Dados incompletos para reportar perda." });
-    }
-
-    const resultado = await movementService.reportarPerda(itemId, adminId);
+    const resultado = await movementService.reportarPerda(Number(itemId), Number(adminLogadoId));
     return res.status(200).json(resultado);
   } catch (error: any) {
     return res.status(500).json({ error: error.message || "Erro interno ao reportar perda." });
   }
 };
 
-export const create = async (req: Request, res: Response) => {
+export const recuperarItemController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { type, userId, adminId, itemId } = req.body;
-    
-    const newMovement = await movementService.createMovement({
-      type,
-      userId,
-      adminId,
-      itemId,
-    });
-    
-    res.status(201).json(newMovement);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Erro ao registrar movimentação." });
-  }
-};
+    const { itemId } = req.body; 
+    const adminLogadoId = req.usuario.id; 
+    if (!itemId) {
+      return res.status(400).json({ error: "O ID do item é obrigatório." });
+    }
 
-export const list = async (req: Request, res: Response) => {
-  try {
-    const movements = await movementService.getAllMovements();
-    res.json(movements);
-  } catch (error) {
-    res.status(500).json({ error: "Erro interno ao buscar movimentações." });
+    const resultado = await movementService.recuperarItem(Number(itemId), Number(adminLogadoId));
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || "Erro interno ao recuperar item." });
   }
 };

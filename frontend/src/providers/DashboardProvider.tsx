@@ -1,18 +1,31 @@
-import React, { createContext, useContext, useState, useMemo, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 
 export interface MovimentacaoDashboard {
   id: string;
-  tipo: "entrega" | "devolucao";
+  itemId: string;
+  tipo: 'entrega' | 'devolucao' | 'perda';
   item: string;
-  tipoItem: "chave" | "kit";
+  tipoItem: 'chave' | 'kit' | 'chave/kit';
+  tiposFaltando: ('chave' | 'kit')[];
   usuario: string;
+  timestamp: string;
   horario: string;
+  status: 'pendente' | 'devolvido' | 'perdido';
 }
 
 export interface ItemPendente {
   id: string;
   nome: string;
-  tipo: "chave" | "kit";
+  tipo: 'chave' | 'kit' | 'chave/kit';
+  tiposFaltando: ('chave' | 'kit')[];
   usuario: string;
   dataRetirada: string;
   horaRetirada: string;
@@ -20,10 +33,8 @@ export interface ItemPendente {
 
 export interface DadosDia {
   data: string;
-  chavesEntregues: number;
-  chavesDevolvidas: number;
-  kitsEntregues: number;
-  kitsDevolvidos: number;
+  recursosEntregues: number;
+  recursosDevolvidos: number;
   movimentacoes: MovimentacaoDashboard[];
 }
 
@@ -40,123 +51,73 @@ interface DashboardContextData {
   carregarDashboard: () => Promise<void>;
 }
 
-const API_URL = "http://localhost:3000";
+const API_URL =
+  (import.meta as unknown as { env: { VITE_API_URL?: string } }).env
+    ?.VITE_API_URL || 'http://localhost:3000';
 
-const DashboardContext = createContext<DashboardContextData>({} as DashboardContextData);
+const DashboardContext = createContext<DashboardContextData>(
+  {} as DashboardContextData,
+);
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [dadosDiarios, setDadosDiarios] = useState<DadosDia[]>([]);
   const [itensPendentes, setItensPendentes] = useState<ItemPendente[]>([]);
-  const [buscaPendentes, setBuscaPendentes] = useState("");
+  const [buscaPendentes, setBuscaPendentes] = useState('');
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [diaDetalhado, setDiaDetalhado] = useState<DadosDia | null>(null);
 
   const dadosHoje = useMemo<DadosDia>(() => {
-    const hojeStr = new Date().toISOString().split("T")[0];
-    return dadosDiarios.find((d) => d.data === hojeStr) || {
+    if (dadosDiarios && dadosDiarios.length > 0) {
+      return dadosDiarios[0];
+    }
+
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    const hojeStr = `${ano}-${mes}-${dia}`;
+
+    return {
       data: hojeStr,
-      chavesEntregues: 0,
-      chavesDevolvidas: 0,
-      kitsEntregues: 0,
-      kitsDevolvidos: 0,
+      recursosEntregues: 0,
+      recursosDevolvidos: 0,
       movimentacoes: [],
     };
   }, [dadosDiarios]);
 
-  useEffect(() => {
-    carregarDashboard();
-  }, []);
-
-  const carregarDashboard = async () => {
+  const carregarDashboard = useCallback(async () => {
     try {
-      const [resRooms, resMovements, resUsers] = await Promise.all([
-        fetch(`${API_URL}/rooms`),
-        fetch(`${API_URL}/movements`),
-        fetch(`${API_URL}/users`),
-      ]);
+      const response = await fetch(`${API_URL}/dashboard`, {
+        credentials: 'include',
+      });
 
-      if (resRooms.ok && resMovements.ok && resUsers.ok) {
-        const rooms = await resRooms.json();
-        const movements = await resMovements.json();
-        const users = await resUsers.json();
+      if (response.ok) {
+        const {
+          itensPendentes: pendentesApi,
+          dadosDiarios: diariosApi,
+        }: { itensPendentes: ItemPendente[]; dadosDiarios: DadosDia[] } =
+          await response.json();
 
-        // 1. MAPEAMENTO DE ITENS PENDENTES (status === "UNAVAILABLE")
-        const pendentes: ItemPendente[] = [];
-        rooms.forEach((room: any) => {
-          room.items?.forEach((item: any) => {
-            if (item.status === "UNAVAILABLE") {
-              const ultimaMov = movements
-                .filter((m: any) => m.itemId === item.id && m.type === "BORROW")
-                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
-              if (ultimaMov) {
-                const userObj = ultimaMov.user || users.find((u: any) => u.id === ultimaMov.userId);
-                const dateObj = new Date(ultimaMov.createdAt);
-
-                pendentes.push({
-                  id: String(item.id),
-                  nome: `${room.name} — ${item.name}`,
-                  tipo: item.type === "KEY" ? "chave" : "kit",
-                  usuario: userObj?.fullName || "Desconhecido",
-                  dataRetirada: dateObj.toISOString().split("T")[0],
-                  horaRetirada: dateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                });
-              }
-            }
-          });
-        });
-        setItensPendentes(pendentes);
-
-        // 2. AGRUPAMENTO DOS ÚLTIMOS 7 DIAS HISTÓRICOS
-        const ultimos7Dias: DadosDia[] = [];
-        for (let i = 0; i < 7; i++) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const dataIso = d.toISOString().split("T")[0];
-
-          const movsDoDia = movements.filter((m: any) => m.createdAt.startsWith(dataIso));
-
-          const movimentacoesFormatadas: MovimentacaoDashboard[] = movsDoDia.map((m: any) => {
-            const roomObj = rooms.find((r: any) => r.items?.some((it: any) => it.id === m.itemId));
-            const itemObj = roomObj?.items?.find((it: any) => it.id === m.itemId);
-            const userObj = m.user || users.find((u: any) => u.id === m.userId);
-
-            return {
-              id: String(m.id),
-              tipo: m.type === "RETURN" ? "devolucao" : "entrega",
-              item: roomObj ? `${roomObj.name} (${itemObj?.name})` : "Recurso Removido",
-              tipoItem: itemObj?.type === "KEY" ? "chave" : "kit",
-              usuario: userObj?.fullName || "Desconhecido",
-              horario: new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-            };
-          });
-
-          const chavesEntregues = movsDoDia.filter((m: any) => m.type === "BORROW" && rooms.find((r: any) => r.items?.some((it: any) => it.id === m.itemId && it.type === "KEY"))).length;
-          const chavesDevolvidas = movsDoDia.filter((m: any) => m.type === "RETURN" && rooms.find((r: any) => r.items?.some((it: any) => it.id === m.itemId && it.type === "KEY"))).length;
-          const kitsEntregues = movsDoDia.filter((m: any) => m.type === "BORROW" && rooms.find((r: any) => r.items?.some((it: any) => it.id === m.itemId && it.type === "KIT"))).length;
-          const kitsDevolvidos = movsDoDia.filter((m: any) => m.type === "RETURN" && rooms.find((r: any) => r.items?.some((it: any) => it.id === m.itemId && it.type === "KIT"))).length;
-
-          ultimos7Dias.push({
-            data: dataIso,
-            chavesEntregues,
-            chavesDevolvidas,
-            kitsEntregues,
-            kitsDevolvidos,
-            movimentacoes: movimentacoesFormatadas,
-          });
-        }
-        setDadosDiarios(ultimos7Dias);
+        setItensPendentes(pendentesApi);
+        setDadosDiarios(diariosApi);
       }
     } catch (error) {
-      console.error("Erro ao carregar dados do dashboard:", error);
+      console.error('Erro ao carregar dados do dashboard:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line
+    carregarDashboard();
+  }, [carregarDashboard]);
 
   const itensPendentesFiltrados = useMemo(() => {
     if (!buscaPendentes) return itensPendentes;
     const termo = buscaPendentes.toLowerCase();
     return itensPendentes.filter(
-      (item) => item.nome.toLowerCase().includes(termo) || item.usuario.toLowerCase().includes(termo)
+      (item) =>
+        item.nome.toLowerCase().includes(termo) ||
+        item.usuario.toLowerCase().includes(termo),
     );
   }, [itensPendentes, buscaPendentes]);
 
@@ -180,4 +141,5 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useDashboard = () => useContext(DashboardContext);

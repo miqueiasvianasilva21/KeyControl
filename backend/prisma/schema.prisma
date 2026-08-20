@@ -6,13 +6,17 @@ datasource db {
   provider = "postgresql"
 }
 
-// ==========================================
-// 1. ENUMS (Regras de Negócio)
-// ==========================================
+
 enum Role {
   STUDENT
   TEACHER
   EXTERNAL
+  ADMINISTRATIVE
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
 }
 
 enum ItemStatus {
@@ -27,20 +31,19 @@ enum MovementType {
   LOSS_REPORT
 }
 
-// NOVO: Diferencia o tipo do Item na mesma tabela
+
 enum ItemType {
   KEY
   KIT
 }
 
-// ==========================================
-// 2. USUÁRIOS E ADMINISTRAÇÃO
-// ==========================================
+
 model Admin {
   id       Int    @id @default(autoincrement())
   name     String
   email    String @unique
   password String
+  role     AdminRole @default(ADMIN)
 
   movements Movement[]
 }
@@ -51,43 +54,35 @@ model User {
   phone    String
   role     Role   @default(STUDENT)
 
-  // Histórico: Movimentações em que esta pessoa foi retirar/devolver algo
   movements Movement[] @relation("UserMovements")
 
-  // Se for ALUNO/EXTERNO: Autorizações que ele recebeu para pegar itens
   authorizationsReceived Authorization[] @relation("StudentAuth")
 
-  // Se for PROFESSOR: Autorizações que ele concedeu para os alunos
   authorizationsGiven Authorization[] @relation("TeacherAuth")
 
-  // Se for PROFESSOR: Histórico de movimentações que ele foi o autorizador
   authorizedMovements Movement[] @relation("TeacherMovements")
 }
 
-// ==========================================
-// 3. ESTRUTURA FÍSICA (Salas e Itens)
-// ==========================================
 
-// NOVO: Entidade Sala gerencia os itens
 model Room {
   id          Int     @id @default(autoincrement())
-  name        String  // Ex: "Laboratório de Informática"
-  number      String  // Ex: "101" (String é melhor que Int caso tenha letras, ex: "101A")
-  block       String  // Ex: "Bloco 2"
+  name        String  
+  number      String  
+  block       String  
 
   items          Item[]
   authorizations Authorization[]
 }
 
-// UNIFICADO: Chaves e Kits agora são a mesma entidade
+
 model Item {
   id     Int        @id @default(autoincrement())
-  name   String     // Ex: "Chave Principal" ou "Kit Arduino"
-  code   String     @unique
-  type   ItemType   // Define se é KEY ou KIT
+  name   String   
+  code   String     
+  type   ItemType   
   status ItemStatus @default(AVAILABLE)
 
-  // Vínculo obrigatório: Todo item pertence a uma sala
+  
   roomId Int
   room   Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
@@ -95,9 +90,7 @@ model Item {
   
 }
 
-// ==========================================
-// 4. AUTORIZAÇÕES
-// ==========================================
+
 model Authorization {
   id Int @id @default(autoincrement())
 
@@ -107,32 +100,31 @@ model Authorization {
   teacherId Int
   teacher   User @relation("TeacherAuth", fields: [teacherId], references: [id], onDelete: Cascade)
 
-  // ALTERADO: Sai itemId, entra roomId
+  
   roomId Int
   room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 }
 
-// ==========================================
-// 5. MOVIMENTAÇÕES (Histórico e Logs)
-// ==========================================
+
+
 model Movement {
   id        Int          @id @default(autoincrement())
   type      MovementType
   createdAt DateTime     @default(now())
 
-  // Quem operou o sistema na portaria/secretaria (Obrigatório)
+  
   adminId Int
   admin   Admin @relation(fields: [adminId], references: [id])
 
-  // Quem pegou ou devolveu fisicamente (SetNull para preservar o histórico)
+ 
   userId Int?
   user   User? @relation("UserMovements", fields: [userId], references: [id], onDelete: SetNull)
 
-  // Qual professor autorizou essa movimentação específica
+  
   teacherId Int?
   teacher   User? @relation("TeacherMovements", fields: [teacherId], references: [id], onDelete: SetNull)
 
-  // UNIFICADO: O Item movimentado (SetNull para preservar o histórico se o item for deletado)
+  
   itemId Int?
   item   Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
 }

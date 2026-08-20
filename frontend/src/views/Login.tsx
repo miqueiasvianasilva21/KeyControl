@@ -1,32 +1,32 @@
-import { useState } from "react";
-import { LogIn, Key } from "lucide-react";
-import { useNavigate } from "react-router";
-import { useAuth } from "../contexts/AuthContext";
+import { useState } from 'react';
+import { LogIn, Key } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Login() {
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [erroLocal, setErroLocal] = useState("");
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erroLocal, setErroLocal] = useState('');
 
   const navigate = useNavigate();
   const { login, erro: erroServidor } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErroLocal("");
+    setErroLocal('');
 
-    if (!email || !senha) return setErroLocal("Por favor, preencha todos os campos.");
-    if (!email.includes("@")) return setErroLocal("Por favor, insira um email válido.");
+    if (!email || !senha)
+      return setErroLocal('Por favor, preencha todos os campos.');
+    if (!email.includes('@'))
+      return setErroLocal('Por favor, insira um email válido.');
 
     try {
       await login(email, senha);
-      navigate("/dashboard");
+      navigate('/dashboard');
     } catch (error) {
-      // O erro do servidor é pego automaticamente pelo Contexto
+      console.error('Falha na tentativa de login:', error);
     }
   };
-
-  // Junta os erros do formulário com os erros vindos do backend
   const erroExibicao = erroLocal || erroServidor;
 
   return (
@@ -37,7 +37,9 @@ export function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#a78bfa] rounded-2xl mb-4 shadow-md">
             <Key className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-foreground mb-2">KeyControl</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-foreground mb-2">
+            KeyControl
+          </h1>
           <p className="text-gray-600 dark:text-muted-foreground">
             Sistema de Controle de Chaves e Kits
           </p>
@@ -57,7 +59,10 @@ export function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Campo de Email */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-foreground">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 dark:text-foreground"
+              >
                 Email
               </label>
               <input
@@ -67,14 +72,19 @@ export function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={`w-full h-10 px-3 rounded-md border bg-transparent text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-[#a78bfa] ${
-                  erroExibicao ? "border-red-300 focus:ring-red-500" : "border-gray-300 dark:border-input"
+                  erroExibicao
+                    ? 'border-red-300 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-input'
                 }`}
               />
             </div>
 
             {/* Campo de Senha */}
             <div className="space-y-2">
-              <label htmlFor="senha" className="block text-sm font-medium text-gray-700 dark:text-foreground">
+              <label
+                htmlFor="senha"
+                className="block text-sm font-medium text-gray-700 dark:text-foreground"
+              >
                 Senha
               </label>
               <input
@@ -84,7 +94,9 @@ export function Login() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 className={`w-full h-10 px-3 rounded-md border bg-transparent text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-[#a78bfa] ${
-                  erroExibicao ? "border-red-300 focus:ring-red-500" : "border-gray-300 dark:border-input"
+                  erroExibicao
+                    ? 'border-red-300 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-input'
                 }`}
               />
             </div>
@@ -92,7 +104,9 @@ export function Login() {
             {/* Mensagem de Erro */}
             {erroExibicao && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{erroExibicao}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {erroExibicao}
+                </p>
               </div>
             )}
 
@@ -117,7 +131,8 @@ export function Login() {
         {/* Texto de Ajuda */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500 dark:text-muted-foreground">
-            Problemas para acessar? Entre em contato com o administrador do sistema.
+            Problemas para acessar? Entre em contato com o administrador do
+            sistema.
           </p>
         </div>
       </div>

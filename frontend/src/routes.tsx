@@ -1,30 +1,35 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router"; 
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { RoomProvider } from "./providers/RoomProvider";
-import { KeyProvider } from "./providers/KeyProvider";
-import { KitProvider } from "./providers/KitProvider";
-import { ReceiveProvider } from "./providers/ReceiveProvider";
-import { HistoryProvider } from "./providers/HistoryProvider"; 
-import { UserProvider } from "./providers/UserProvider"; 
-import { DashboardProvider } from "./providers/DashboardProvider";
-import { Login } from "./views/Login";
-import { Dashboard } from "./views/Dashboard";
-import { Layout } from "./views/Layout";
-import { Chaves } from "./views/Chaves";
-import { Kits } from "./views/Kits";
-import { ReceberChave } from "./views/ReceberChave";
-import { Usuarios } from "./views/Usuarios";
-import { Salas } from "./views/Salas";
-import { HistoricoSalas } from "./views/HistoricoSalas";
+import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { RoomProvider } from './providers/RoomProvider';
+import { ItemProvider } from './providers/ItemProvider';
+import { ReceiveProvider } from './providers/ReceiveProvider';
+import { HistoryProvider } from './providers/RoomHistoryProvider';
+import { UserProvider } from './providers/UserProvider';
+import { DashboardProvider } from './providers/DashboardProvider';
+import { AdminProvider } from './providers/AdminProvider';
+import { Login } from './views/Login';
+import { Dashboard } from './views/Dashboard';
+import { Layout } from './views/Layout';
+import { Keys } from './views/Keys';
+import { Kits } from './views/Kits';
+import { Receive } from './views/Receive';
+import { Users } from './views/Users';
+import { Rooms } from './views/Rooms';
+import { RoomHistory } from './views/RoomHistory';
+import { Admins } from './views/Admins';
 
 const RotaProtegida = () => {
-  const { estaLogado } = useAuth();
-  
-  if (!estaLogado) {
-    return <Navigate to="/login" replace />; 
+  const { estaLogado, carregandoSessao } = useAuth();
+
+  if (carregandoSessao) {
+    return null;
   }
-  
-  return <Outlet />; 
+
+  if (!estaLogado) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export const router = createBrowserRouter([
@@ -36,7 +41,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        path: "/login",
+        path: '/login',
         element: <Login />,
       },
       {
@@ -46,66 +51,73 @@ export const router = createBrowserRouter([
             element: <Layout />,
             children: [
               {
-                path: "/",
+                path: '/',
                 element: <Navigate to="/dashboard" replace />,
               },
-              { 
-  path: "/chaves", 
-  element: (
-    <KeyProvider>
-      <Chaves />
-    </KeyProvider>
-  ) 
-},
-              { 
-  path: "/kits", 
-  element: (
-    <KitProvider>
-      <Kits />
-    </KitProvider>
-  ) 
-},
-              { 
-  path: "/receber", 
-  element: (
-    <ReceiveProvider>
-      <ReceberChave />
-    </ReceiveProvider>
-  ) 
-},
-              { 
-  path: "/usuarios", 
-  element: (
-    <UserProvider>
-      <Usuarios />
-    </UserProvider>
-  ) 
-},
-{ 
-  path: "/historico", 
-  element: (
-    <HistoryProvider>
-      <HistoricoSalas />
-    </HistoryProvider>
-  ) 
-},
-{
-  path: "/dashboard",
-  element: (
-    <DashboardProvider>
-      <Dashboard />
-    </DashboardProvider>
-  ),
-},
-              { 
-                path: "/salas", 
+              {
+                path: '/chaves',
+                element: (
+                  <ItemProvider>
+                    <Keys />
+                  </ItemProvider>
+                ),
+              },
+              {
+                path: '/kits',
+                element: (
+                  <ItemProvider>
+                    <Kits />
+                  </ItemProvider>
+                ),
+              },
+              {
+                path: '/receber',
+                element: (
+                  <ReceiveProvider>
+                    <Receive />
+                  </ReceiveProvider>
+                ),
+              },
+              {
+                path: '/usuarios',
+                element: (
+                  <UserProvider>
+                    <Users />
+                  </UserProvider>
+                ),
+              },
+              {
+                path: '/historico',
+                element: (
+                  <HistoryProvider>
+                    <RoomHistory />
+                  </HistoryProvider>
+                ),
+              },
+              {
+                path: '/dashboard',
+                element: (
+                  <DashboardProvider>
+                    <Dashboard />
+                  </DashboardProvider>
+                ),
+              },
+              {
+                path: '/administradores',
+                element: (
+                  <AdminProvider>
+                    <Admins />
+                  </AdminProvider>
+                ),
+              },
+              {
+                path: '/salas',
                 element: (
                   <RoomProvider>
-                    <Salas />
+                    <Rooms />
                   </RoomProvider>
-                ) 
+                ),
               },
-              
             ],
           },
         ],

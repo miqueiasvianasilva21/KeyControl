@@ -1,0 +1,24 @@
+{
+  "name": "gerenciamento-chaves",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miqueiasvianasilva21/KeyControl.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/miqueiasvianasilva21/KeyControl/issues"
+  },
+  "homepage": "https://github.com/miqueiasvianasilva21/KeyControl#readme",
+  "dependencies": {
+    "@openai/codex": "^0.145.0"
+  }
+}
