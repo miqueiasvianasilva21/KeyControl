@@ -17,8 +17,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+RUN npm install -g pm2
+
 COPY --from=build /app ./
+COPY ecosystem.config.cjs ./
+COPY docker-entrypoint.sh /usr/local/bin/
+
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]

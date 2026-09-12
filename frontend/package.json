@@ -8,15 +8,20 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "pm2-runtime start ecosystem.config.cjs",
+    "serve": "node server.cjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.16.0",
+    "pm2": "^5.4.3",
     "radix-ui": "^1.4.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

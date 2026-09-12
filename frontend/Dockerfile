@@ -13,11 +13,20 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM node:20-alpine
 
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+WORKDIR /app
+
+RUN npm install -g pm2
+
+COPY package*.json ./
+
+RUN npm install --omit=dev
+
+COPY --from=build /app/dist ./dist
+COPY server.cjs ./
+COPY ecosystem.config.cjs ./
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]
