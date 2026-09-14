@@ -5,7 +5,7 @@ import "dotenv/config";
 export default defineConfig({
  
   migrations: {
-    seed: 'npx ts-node prisma/seed.ts',
+    seed: 'node dist/database/seed.js',
   },
   
   datasource: {

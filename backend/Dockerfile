@@ -19,7 +19,13 @@ WORKDIR /app
 
 RUN npm install -g pm2
 
-COPY --from=build /app ./
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm install --omit=dev
+RUN npx prisma generate
+
+COPY --from=build /app/dist ./dist
 COPY ecosystem.config.cjs ./
 COPY docker-entrypoint.sh /usr/local/bin/
 

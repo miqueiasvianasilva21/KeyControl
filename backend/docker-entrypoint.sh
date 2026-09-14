@@ -23,11 +23,8 @@ done
 echo "Running database migrations..."
 npx prisma migrate deploy
 
-echo "Generating Prisma client..."
-npx prisma generate
-
 echo "Seeding database..."
-npx prisma db seed
+node dist/database/seed.js
 
 echo "Starting backend process..."
 exec "$@"
